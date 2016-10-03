@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/wxbot4j.iml" filepath="$PROJECT_DIR$/wxbot4j.iml" />
+      <module fileurl="file://$PROJECT_DIR$/wx4j.iml" filepath="$PROJECT_DIR$/wx4j.iml" />
     </modules>
   </component>
 </project>
