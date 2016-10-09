@@ -3,26 +3,30 @@ package com.lostjs.wx4j.client;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.lostjs.wx4j.context.WxContext;
 import com.lostjs.wx4j.data.SyncResponse;
+import com.lostjs.wx4j.data.request.BaseRequest;
 import com.lostjs.wx4j.data.request.TinyContact;
 import com.lostjs.wx4j.data.response.*;
-import com.lostjs.wx4j.transporter.BasicWxTransporter;
+import com.lostjs.wx4j.transporter.WxTransporter;
 import com.lostjs.wx4j.utils.HttpUtil;
 import com.lostjs.wx4j.utils.WxSyncKeyUtil;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.ServiceUnavailableRetryStrategy;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.protocol.HttpContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Created by pw on 02/10/2016.
@@ -69,10 +73,10 @@ public class BasicWxClient implements WxClient {
 
     private Logger LOG = LoggerFactory.getLogger(this.getClass());
 
-    private BasicWxTransporter transporter;
+    private WxTransporter transporter;
 
     @Override
-    public void setTransporter(BasicWxTransporter transporter) {
+    public void setTransporter(WxTransporter transporter) {
         this.transporter = transporter;
     }
 
@@ -86,19 +90,31 @@ public class BasicWxClient implements WxClient {
 
     @Override
     public List<GroupMember> getGroupMembers(String groupUserName) {
+
+        List<String> userNames = new ArrayList<>();
+        userNames.add(groupUserName);
+
+        List<Contact> contacts = getContactsByUserNames(userNames);
+
+        return contacts.get(0).getMemberList();
+    }
+
+    @Override
+    public List<Contact> getContactsByUserNames(List<String> userNames) {
         Map<String, Object> dataMap = new HashMap<>();
-        dataMap.put("Count", 1);
-        List<TinyContact> contacts = new ArrayList<>();
-        TinyContact group = new TinyContact();
-        group.setUserName(groupUserName);
-        group.setEncryChatRoomId(StringUtils.EMPTY);
-        contacts.add(group);
-        dataMap.put("List", contacts);
-        GroupMemberResponse memberResponse = transporter.execute(API_BATCH_GET_CONTACT, dataMap,
-                new TypeReference<GroupMemberResponse>() {
+        dataMap.put("Count", userNames.size());
+        List<TinyContact> tinyContacts = userNames.stream().map(n -> {
+            TinyContact contact = new TinyContact();
+            contact.setUserName(n);
+            contact.setEncryChatRoomId(StringUtils.EMPTY);
+            return contact;
+        }).collect(Collectors.toList());
+        dataMap.put("List", tinyContacts);
+        ContactListResponse contactList = transporter.execute(API_BATCH_GET_CONTACT, dataMap,
+                new TypeReference<ContactListResponse>() {
                 });
 
-        return memberResponse.getContacts().get(0).getMemberList();
+        return contactList.getContacts();
     }
 
     @Override
@@ -107,6 +123,7 @@ public class BasicWxClient implements WxClient {
             init();
         }
 
+        LOG.info("check valid comet host");
         String validHost = null;
         SyncCheckResponse checkResponse = null;
         for (String host : PUSH_HOST_LIST) {
@@ -127,17 +144,40 @@ public class BasicWxClient implements WxClient {
         }
 
         String finalValidHost = validHost;
+        LOG.info("valid comet host: {}", validHost);
         new Thread(() -> {
             while (true) {
-                SyncCheckResponse syncCheckResponse = syncComet(finalValidHost);
-
-                if (syncCheckResponse.getRetcode() != 0) {
-                    throw new RuntimeException("invalid synccheck retcode, retcode=" + syncCheckResponse.getRetcode());
+                SyncCheckResponse syncCheckResponse = null;
+                try {
+                    syncCheckResponse = syncComet(finalValidHost);
+                } catch (RuntimeException e) {
+                    LOG.error("exception when sync check", e);
+                    try {
+                        Thread.sleep(TimeUnit.SECONDS.toMillis(3));
+                    } catch (InterruptedException e1) {
+                        throw new RuntimeException(e1);
+                    }
+                    continue;
                 }
 
-                sync();
+                if (syncCheckResponse.getRetcode() != 0) {
+                    LOG.error("invalid synccheck retcode, retcode=" + syncCheckResponse.getRetcode());
+                    try {
+                        Thread.sleep(TimeUnit.SECONDS.toMillis(10));
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                } else {
+                    LOG.info("synccheck retcode = {}", syncCheckResponse.getRetcode());
+                }
+
+                try {
+                    sync();
+                } catch (RuntimeException e) {
+                    LOG.error("sync exception", e);
+                }
             }
-        });
+        }).start();
     }
 
     @Override
@@ -156,11 +196,77 @@ public class BasicWxClient implements WxClient {
         return statusNotifyResponse.getMsgId();
     }
 
+    @Override
+    public boolean addContact(String userName, String reason) {
+        int retryCount = 10;
+        int[] retryDuration = {1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144};
+
+        AddContactResponse addContactResponse = null;
+        for (int i = 0; i < retryCount; i++) {
+            try {
+                addContactResponse = internalAddContact(userName, reason);
+            } catch (RuntimeException e) {
+                LOG.warn("add contact got a invalid result", e);
+
+                try {
+                    Thread.sleep(TimeUnit.MINUTES.toMillis(retryDuration[i]));
+                } catch (InterruptedException e1) {
+                    throw new RuntimeException(e1);
+                }
+
+                continue;
+            }
+
+            return true;
+        }
+
+        assert addContactResponse != null;
+
+        LOG.warn("can't add contact, Ret={}, ErrMsg={}", addContactResponse.getBaseResponse().getRet(),
+                addContactResponse.getBaseResponse().getErrMsg());
+
+        return false;
+    }
+
+    @Override
+    public boolean updateRemarkName(String userName, String remarkName) {
+        Map<String, Object> dataMap = new HashMap<>();
+        dataMap.put("CmdId", 2);
+        dataMap.put("RemarkName", remarkName);
+        dataMap.put("UserName", userName);
+
+        transporter.execute("/webwxoplog", dataMap,
+                new TypeReference<UpdateRemarkNameResponse>() {
+                });
+
+        return true;
+    }
+
+    private AddContactResponse internalAddContact(String userName, String reason) {
+        Map<String, Object> dataMap = new HashMap<>();
+        dataMap.put("Opcode", 2);
+        dataMap.put("VerifyContent", reason);
+        dataMap.put("skey", getContext().getSkey());
+        dataMap.put("VerifyUserListSize", 1);
+        ArrayList<Map<String, Object>> verifyUserList = new ArrayList<>();
+        Map<String, Object> verifyUser = new HashMap<>();
+        verifyUser.put("Value", userName);
+        verifyUser.put("VerifyUserTicket", "");
+        verifyUserList.add(verifyUser);
+        dataMap.put("VerifyUserList", verifyUserList);
+        dataMap.put("SceneListCount", 1);
+        dataMap.put("SceneList", Collections.singletonList(33));
+        return transporter.execute("/webwxverifyuser", dataMap,
+                new TypeReference<AddContactResponse>() {
+                });
+    }
+
     private long getClientMessageId() {
         return System.currentTimeMillis() / 1000;
     }
 
     private void sync() {
+        LOG.info("sync");
         if (StringUtils.isEmpty(getContext().getUserName())) {
             init();
         }
@@ -181,21 +287,36 @@ public class BasicWxClient implements WxClient {
     }
 
     private SyncCheckResponse syncComet(String host) {
+        LOG.info("sync comet to {}", host);
         WxContext context = getContext();
+        BaseRequest baseRequest = new BaseRequest(context);
         URI uri;
         try {
             uri = new URIBuilder(getPushApi(host))
                     .addParameter(REQUEST_FIELD_RANDOM_FOR_PUSH, String.valueOf(System.currentTimeMillis()))
-                    .addParameter(REQUEST_FIELD_SID_FOR_PUSH, context.getSid())
-                    .addParameter(REQUEST_FIELD_UIN_FOR_PUSH, context.getUin())
-                    .addParameter(REQUEST_FIELD_SKEY_FOR_PUSH, context.getSkey())
-                    .addParameter(REQUEST_FIELD_DEVICE_ID_FOR_PUSH, context.getDeviceId())
+                    .addParameter(REQUEST_FIELD_SID_FOR_PUSH, baseRequest.getSid())
+                    .addParameter(REQUEST_FIELD_UIN_FOR_PUSH, baseRequest.getUin())
+                    .addParameter(REQUEST_FIELD_SKEY_FOR_PUSH, baseRequest.getSkey())
+                    .addParameter(REQUEST_FIELD_DEVICE_ID_FOR_PUSH, baseRequest.getDeviceID())
                     .addParameter(REQUEST_FIELD_SYNC_KEY_FOR_PUSH, WxSyncKeyUtil.format(context.getSyncKeys())).build();
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
 
-        String response = HttpUtil.execute(uri, new HttpGet(uri), HttpClientBuilder.create().build());
+        String response = HttpUtil.execute(uri, new HttpGet(uri), HttpClientBuilder.create().setRetryHandler(
+                new DefaultHttpRequestRetryHandler()).setServiceUnavailableRetryStrategy(
+                new ServiceUnavailableRetryStrategy() {
+                    @Override
+                    public boolean retryRequest(HttpResponse response, int executionCount, HttpContext context) {
+                        int statusCode = response.getStatusLine().getStatusCode();
+                        return statusCode != 200 && executionCount < 5;
+                    }
+
+                    @Override
+                    public long getRetryInterval() {
+                        return 1000;
+                    }
+                }).build());
 
         Pattern pattern = Pattern.compile("window\\.synccheck=\\{retcode:\"(\\d+)\",selector:\"(\\d+)\"\\}");
         Matcher m = pattern.matcher(response);

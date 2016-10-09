@@ -1,16 +1,23 @@
 package com.lostjs.wx4j.context;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lostjs.wx4j.data.SyncKey;
+import org.apache.http.cookie.Cookie;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 
 /**
  * Created by pw on 02/10/2016.
  */
 public abstract class AbstractPersistentWxContext implements WxContext {
+
+    private final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
     protected WxContext internalContext;
 
@@ -21,18 +28,6 @@ public abstract class AbstractPersistentWxContext implements WxContext {
     }
 
     @Override
-    public String getUserName() {
-        lazyLoad();
-        return internalContext.getUserName();
-    }
-
-    @Override
-    public void setUserName(String userName) {
-        internalContext.setUserName(userName);
-        write();
-    }
-
-    @Override
     public String getSkey() {
         lazyLoad();
         return internalContext.getSkey();
@@ -40,6 +35,7 @@ public abstract class AbstractPersistentWxContext implements WxContext {
 
     @Override
     public void setSkey(String skey) {
+        lazyLoad();
         internalContext.setSkey(skey);
         write();
     }
@@ -52,6 +48,7 @@ public abstract class AbstractPersistentWxContext implements WxContext {
 
     @Override
     public void setSid(String sid) {
+        lazyLoad();
         internalContext.setSid(sid);
         write();
     }
@@ -64,6 +61,7 @@ public abstract class AbstractPersistentWxContext implements WxContext {
 
     @Override
     public void setUin(String uin) {
+        lazyLoad();
         internalContext.setUin(uin);
         write();
     }
@@ -76,6 +74,7 @@ public abstract class AbstractPersistentWxContext implements WxContext {
 
     @Override
     public void setPassTicket(String passTicket) {
+        lazyLoad();
         internalContext.setPassTicket(passTicket);
         write();
     }
@@ -88,19 +87,8 @@ public abstract class AbstractPersistentWxContext implements WxContext {
 
     @Override
     public void setBaseUrl(String baseUrl) {
-        internalContext.setBaseUrl(baseUrl);
-        write();
-    }
-
-    @Override
-    public String getDeviceId() {
         lazyLoad();
-        return internalContext.getDeviceId();
-    }
-
-    @Override
-    public void setDeviceId(String deviceId) {
-        internalContext.setDeviceId(deviceId);
+        internalContext.setBaseUrl(baseUrl);
         write();
     }
 
@@ -112,8 +100,60 @@ public abstract class AbstractPersistentWxContext implements WxContext {
 
     @Override
     public void setSyncKeys(List<SyncKey> syncKeys) {
+        lazyLoad();
         internalContext.setSyncKeys(syncKeys);
         write();
+    }
+
+    @Override
+    public String getUserName() {
+        lazyLoad();
+        return internalContext.getUserName();
+    }
+
+    @Override
+    public void setUserName(String userName) {
+        lazyLoad();
+        internalContext.setUserName(userName);
+        write();
+    }
+
+    @Override
+    public List<Cookie> getCookies() {
+        lazyLoad();
+        return internalContext.getCookies();
+    }
+
+    @Override
+    public void setCookies(List<Cookie> cookies) {
+        lazyLoad();
+        internalContext.setCookies(cookies);
+        write();
+    }
+
+    @Override
+    public void addCookie(Cookie cookie) {
+        lazyLoad();
+        internalContext.addCookie(cookie);
+        write();
+    }
+
+    @Override
+    public boolean clearExpired(Date date) {
+        lazyLoad();
+        boolean success = internalContext.clearExpired(date);
+        if (success) {
+            write();
+        }
+
+        return success;
+    }
+
+    @Override
+    public void clear() {
+        internalContext.clear();
+        write();
+        internalClear();
     }
 
     protected abstract void write();
@@ -121,17 +161,19 @@ public abstract class AbstractPersistentWxContext implements WxContext {
     protected abstract void read();
 
     protected void loadFromString(String string) {
-        WxContext webContext1;
+        WxContext webContext;
         try {
-            webContext1 = new ObjectMapper().readValue(string, BasicWxContext.class);
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            webContext = objectMapper.readValue(string, BasicWxContext.class);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            LOG.error("can't load context, use empty context instead");
+            LOG.debug("", e);
+            return;
         }
 
-        WxContext webContext = webContext1;
         internalContext.setPassTicket(webContext.getPassTicket());
         internalContext.setBaseUrl(webContext.getBaseUrl());
-        internalContext.setDeviceId(webContext.getDeviceId());
         internalContext.setSid(webContext.getSid());
         internalContext.setSkey(webContext.getSkey());
         internalContext.setSyncKeys(webContext.getSyncKeys());
@@ -144,6 +186,8 @@ public abstract class AbstractPersistentWxContext implements WxContext {
         return objectMapper.writeValueAsString(internalContext);
     }
 
+    protected abstract void internalClear();
+
     private void lazyLoad() {
         if (!loaded) {
             try {
@@ -154,6 +198,4 @@ public abstract class AbstractPersistentWxContext implements WxContext {
             }
         }
     }
-
-    protected abstract void clear();
 }

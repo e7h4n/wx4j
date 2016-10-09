@@ -2,6 +2,7 @@ package com.lostjs.wx4j.data.request;
 
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.lostjs.wx4j.context.WxContext;
+import org.apache.commons.lang3.RandomUtils;
 
 /**
  * Created by pw on 02/10/2016.
@@ -20,7 +21,7 @@ public class BaseRequest {
         uin = context.getUin();
         sid = context.getSid();
         skey = context.getSkey();
-        deviceID = context.getDeviceId();
+        deviceID = randomDeviceId();
     }
 
     @JsonGetter("Uin")
@@ -41,5 +42,14 @@ public class BaseRequest {
     @JsonGetter("DeviceId")
     public String getDeviceID() {
         return deviceID;
+    }
+
+    private String randomDeviceId() {
+        StringBuilder sb = new StringBuilder(16);
+        sb.append("e");
+        for (int i = 0; i < 15; i++) {
+            sb.append(String.valueOf(RandomUtils.nextInt(0, 10)));
+        }
+        return sb.toString();
     }
 }

@@ -6,11 +6,16 @@ import com.lostjs.wx4j.utils.WxCodeParser;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpRequest;
+import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.CookieStore;
+import org.apache.http.client.ServiceUnavailableRetryStrategy;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.HttpContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -46,12 +51,12 @@ public class QRCodeWxContextSource implements WxContextSource {
 
     private String uuid;
 
-    public String prepareLogin() {
-        this.uuid = getUUID();
+    public String prepareLogin(WxContext context) {
+        this.uuid = getUUID(context);
         return this.getLoginUrl();
     }
 
-    public Optional<String> waitLogin() {
+    public Optional<String> waitLogin(WxContext context) {
         /*
         http comet:
         tip=1, 等待用户扫描二维码,
@@ -69,7 +74,7 @@ public class QRCodeWxContextSource implements WxContextSource {
             List<NameValuePair> params = new ArrayList<>();
             params.add(new BasicNameValuePair("tip", String.valueOf(tip)));
             params.add(new BasicNameValuePair("uuid", this.uuid));
-            String response = doGet(url, params);
+            String response = doGet(url, params, context);
 
             Optional<Integer> codeOpt = WxCodeParser.parse(response);
             if (!codeOpt.isPresent()) {
@@ -111,7 +116,7 @@ public class QRCodeWxContextSource implements WxContextSource {
             throw new RuntimeException("do waitForLogin first");
         }
 
-        String response = doGet(loginUrl);
+        String response = doGet(loginUrl, context);
 
         DocumentBuilderFactory factory =
                 DocumentBuilderFactory.newInstance();
@@ -140,19 +145,16 @@ public class QRCodeWxContextSource implements WxContextSource {
         context.setUin(uin);
         context.setPassTicket(passTicket);
 
-        String deviceId = randomDeviceId();
-        context.setDeviceId(deviceId);
-
         LOG.debug("wechat auth context: {}", context.toString());
         return true;
     }
 
     @Override
     public boolean initWxWebContext(WxContext context) {
-        String qrcodeLink = prepareLogin();
+        String qrcodeLink = prepareLogin(context);
         String qrcode = QrCodeUtil.genTerminalQrCode(qrcodeLink);
         LOG.info("Scan qrcode to login: \n{}", qrcode);
-        Optional<String> loginUrl = waitLogin();
+        Optional<String> loginUrl = waitLogin(context);
         if (!loginUrl.isPresent()) {
             throw new RuntimeException("can't get login url");
         }
@@ -160,13 +162,8 @@ public class QRCodeWxContextSource implements WxContextSource {
         return login(loginUrl.get(), context);
     }
 
-    private String randomDeviceId() {
-        StringBuilder sb = new StringBuilder(16);
-        sb.append("e");
-        for (int i = 0; i < 15; i++) {
-            sb.append(String.valueOf(RandomUtils.nextInt(0, 10)));
-        }
-        return sb.toString();
+    private String doGet(String url, CookieStore cookieStore) {
+        return doGet(url, Collections.emptyList(), cookieStore);
     }
 
     private String getBaseUrl(String loginUrl) {
@@ -200,18 +197,14 @@ public class QRCodeWxContextSource implements WxContextSource {
         return nodes.item(0).getTextContent();
     }
 
-    private String doGet(String url) {
-        return doGet(url, Collections.emptyList());
-    }
-
-    private String getUUID() {
+    private String getUUID(WxContext context) {
         ArrayList<NameValuePair> params = new ArrayList<>();
         params.add(new BasicNameValuePair("appid", "wx782c26e4c19acffb"));
         params.add(new BasicNameValuePair("fun", "new"));
         params.add(new BasicNameValuePair("lang", "zh_CN"));
         params.add(new BasicNameValuePair("_", String.valueOf(RandomUtils.nextInt(0, Integer.MAX_VALUE))));
 
-        String responseBody = doGet("https://login.weixin.qq.com/jslogin", params);
+        String responseBody = doGet("https://login.weixin.qq.com/jslogin", params, context);
         Pattern pattern = Pattern.compile("window.QRLogin.code = (\\d+); window.QRLogin.uuid = \"(\\S+?)\"");
         Matcher matcher = pattern.matcher(responseBody);
         int groupCount = matcher.groupCount();
@@ -244,7 +237,7 @@ public class QRCodeWxContextSource implements WxContextSource {
         return String.format("https://login.weixin.qq.com/l/%s", this.uuid);
     }
 
-    private String doGet(String url, List<NameValuePair> params) {
+    private String doGet(String url, List<NameValuePair> params, CookieStore cookieStore) {
         URI uri;
 
         try {
@@ -259,7 +252,19 @@ public class QRCodeWxContextSource implements WxContextSource {
         }
         HttpRequest request = new HttpGet(uri);
 
-        return HttpUtil.execute(uri, request, HttpClientBuilder.create().build());
-    }
+        return HttpUtil.execute(uri, request, HttpClientBuilder.create().setRetryHandler(
+                new DefaultHttpRequestRetryHandler()).setServiceUnavailableRetryStrategy(
+                new ServiceUnavailableRetryStrategy() {
+                    @Override
+                    public boolean retryRequest(HttpResponse response, int executionCount, HttpContext context) {
+                        int statusCode = response.getStatusLine().getStatusCode();
+                        return statusCode != 200 && executionCount < 5;
+                    }
 
+                    @Override
+                    public long getRetryInterval() {
+                        return 1000;
+                    }
+                }).build());
+    }
 }

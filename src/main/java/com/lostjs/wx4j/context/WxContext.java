@@ -1,13 +1,15 @@
 package com.lostjs.wx4j.context;
 
 import com.lostjs.wx4j.data.SyncKey;
+import org.apache.http.client.CookieStore;
+import org.apache.http.cookie.Cookie;
 
 import java.util.List;
 
 /**
  * Created by pw on 02/10/2016.
  */
-public interface WxContext {
+public interface WxContext extends CookieStore {
 
     String getSkey();
 
@@ -29,10 +31,6 @@ public interface WxContext {
 
     void setBaseUrl(String baseUrl);
 
-    String getDeviceId();
-
-    void setDeviceId(String deviceId);
-
     List<SyncKey> getSyncKeys();
 
     void setSyncKeys(List<SyncKey> syncKeys);
@@ -40,4 +38,9 @@ public interface WxContext {
     String getUserName();
 
     void setUserName(String userName);
+
+    @Override
+    List<Cookie> getCookies();
+
+    void setCookies(List<Cookie> cookies);
 }

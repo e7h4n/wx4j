@@ -2,7 +2,7 @@ package com.lostjs.wx4j.client;
 
 import com.lostjs.wx4j.data.response.Contact;
 import com.lostjs.wx4j.data.response.GroupMember;
-import com.lostjs.wx4j.transporter.BasicWxTransporter;
+import com.lostjs.wx4j.transporter.WxTransporter;
 
 import java.util.List;
 
@@ -11,13 +11,19 @@ import java.util.List;
  */
 public interface WxClient {
 
-    void setTransporter(BasicWxTransporter transporter);
+    void setTransporter(WxTransporter transporter);
 
     List<Contact> getContacts();
 
     List<GroupMember> getGroupMembers(String groupUserName);
 
+    List<Contact> getContactsByUserNames(List<String> userNames);
+
     void startEventLoop();
 
     String statusNotify();
+
+    boolean addContact(String userName, String reason);
+
+    boolean updateRemarkName(String userName, String remarkName);
 }

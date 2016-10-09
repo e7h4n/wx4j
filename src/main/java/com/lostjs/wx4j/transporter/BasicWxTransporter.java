@@ -9,31 +9,37 @@ import com.lostjs.wx4j.data.request.BaseRequest;
 import com.lostjs.wx4j.data.response.WxResponse;
 import com.lostjs.wx4j.utils.HttpUtil;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.http.HttpEntity;
+import org.apache.http.Header;
+import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.ServiceUnavailableRetryStrategy;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.HttpContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by pw on 02/10/2016.
  */
 public class BasicWxTransporter implements WxTransporter {
 
-    private Logger LOG = LoggerFactory.getLogger(this.getClass());
-
     protected final WxContext wxContext;
+
+    private Logger LOG = LoggerFactory.getLogger(this.getClass());
 
     public BasicWxTransporter(WxContext WxContext) {
         this.wxContext = WxContext;
@@ -107,7 +113,7 @@ public class BasicWxTransporter implements WxTransporter {
         targetMap.putAll(dataMap);
         targetMap.put("BaseRequest", new BaseRequest(wxContext));
 
-        URI uri = null;
+        URI uri;
         try {
             uri = new URIBuilder(url).addParameters(targetParams).build();
         } catch (URISyntaxException e) {
@@ -123,13 +129,7 @@ public class BasicWxTransporter implements WxTransporter {
             throw new RuntimeException(e);
         }
 
-        HttpEntity entity;
-        try {
-            entity = new StringEntity(body);
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-        httpPost.setEntity(entity);
+        httpPost.setEntity(new StringEntity(body, Charset.forName("UTF-8")));
 
         try {
             String responseBody = HttpUtil.execute(new URI(url), httpPost, getHttpClient());
@@ -140,7 +140,29 @@ public class BasicWxTransporter implements WxTransporter {
     }
 
     private HttpClient getHttpClient() {
-        return HttpClientBuilder.create().build();
+        ArrayList<Header> headers = new ArrayList<>();
+        headers.add(new BasicHeader("Content-Type", "charset=UTF-8"));
+        return HttpClientBuilder.create()
+                .setDefaultCookieStore(wxContext)
+                .setDefaultHeaders(headers)
+                .setRetryHandler(new DefaultHttpRequestRetryHandler())
+                .setServiceUnavailableRetryStrategy(new ServiceUnavailableRetryStrategy() {
+                    @Override
+                    public boolean retryRequest(HttpResponse response, int executionCount, HttpContext context) {
+                        int statusCode = response.getStatusLine().getStatusCode();
+                        boolean retry = statusCode != 200 && executionCount < 10;
+                        if (retry) {
+                            LOG.info("retry, statusCode={}, executionCount = {}", statusCode, executionCount);
+                        }
+                        return retry;
+                    }
+
+                    @Override
+                    public long getRetryInterval() {
+                        return TimeUnit.SECONDS.toMillis(10);
+                    }
+                })
+                .build();
     }
 
     private void checkResponse(WxResponse response) {

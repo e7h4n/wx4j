@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * Created by pw on 02/10/2016.
  */
-public class GroupMemberResponse implements WxResponse {
+public class ContactListResponse implements WxResponse {
 
     private BaseResponse baseResponse;
 

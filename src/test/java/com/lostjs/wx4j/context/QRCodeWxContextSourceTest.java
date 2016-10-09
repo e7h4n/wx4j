@@ -10,6 +10,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+
 /**
  * Created by pw on 01/10/2016.
  */
@@ -26,7 +28,6 @@ public class QRCodeWxContextSourceTest {
         Assert.assertTrue(success);
         Assert.assertTrue(StringUtils.isNotBlank(context.getSid()));
         Assert.assertTrue(StringUtils.isNotBlank(context.getBaseUrl()));
-        Assert.assertTrue(StringUtils.isNotBlank(context.getDeviceId()));
         Assert.assertTrue(StringUtils.isNotBlank(context.getPassTicket()));
         Assert.assertTrue(StringUtils.isNotBlank(context.getSkey()));
         Assert.assertTrue(StringUtils.isNotBlank(context.getUin()));

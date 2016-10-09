@@ -30,7 +30,7 @@ public class Contact {
 
     private int verifyFlag;
 
-    private int ownerUin;
+    private long ownerUin;
 
     private String pyInitial;
 
@@ -160,12 +160,12 @@ public class Contact {
         this.verifyFlag = verifyFlag;
     }
 
-    public int getOwnerUin() {
+    public long getOwnerUin() {
         return ownerUin;
     }
 
     @JsonSetter("OwnerUin")
-    public void setOwnerUin(int ownerUin) {
+    public void setOwnerUin(long ownerUin) {
         this.ownerUin = ownerUin;
     }
 
