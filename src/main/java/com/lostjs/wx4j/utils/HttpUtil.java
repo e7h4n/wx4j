@@ -10,8 +10,6 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.protocol.HttpContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
 
 import java.io.IOException;
@@ -24,7 +22,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * Created by pw on 02/10/2016.
  */
-@Service
 public class HttpUtil {
 
     public static final long RETRY_INTERVAL = TimeUnit.SECONDS.toMillis(10);
@@ -33,8 +30,11 @@ public class HttpUtil {
 
     private final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
-    @Autowired
     private CookieStore cookieStore;
+
+    public void setCookieStore(CookieStore cookieStore) {
+        this.cookieStore = cookieStore;
+    }
 
     public HttpClient getHttpClient() {
         ArrayList<Header> headers = new ArrayList<>();
