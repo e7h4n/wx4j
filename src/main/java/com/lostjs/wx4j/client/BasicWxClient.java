@@ -146,14 +146,16 @@ public class BasicWxClient implements WxClient {
             }
 
             Optional<SyncCheckSelector> selectorOptional = SyncCheckSelector.findByInt(syncCheckResponse.getSelector());
-            if (selectorOptional.isPresent() && selectorOptional.get() != SyncCheckSelector.NORMAL) {
+            if (!selectorOptional.isPresent() || (selectorOptional.isPresent() && selectorOptional.get() != SyncCheckSelector.NORMAL)) {
+                if (!selectorOptional.isPresent()) {
+                    LOG.warn("unknown selector: {}", syncCheckResponse.getSelector());
+                }
+                
                 try {
                     sync();
                 } catch (RuntimeException e) {
                     LOG.error("sync exception", e);
                 }
-            } else if (!selectorOptional.isPresent()) {
-                LOG.warn("unknown selector: {}", syncCheckResponse.getSelector());
             }
         }
     }
