@@ -49,13 +49,9 @@ public class BasicWxClient implements WxClient {
 
     private static final String REQUEST_FIELD_RANDOM_RANDOM = "rr";
 
-    private static final String REQUEST_FIELD_RANDOM_FOR_PUSH = "r";
-
     private static final String REQUEST_FIELD_SID_FOR_PUSH = "sid";
 
     private static final String REQUEST_FIELD_UIN_FOR_PUSH = "uin";
-
-    private static final String REQUEST_FIELD_SKEY_FOR_PUSH = "skey";
 
     private static final String REQUEST_FIELD_DEVICE_ID_FOR_PUSH = "deviceid";
 
@@ -145,7 +141,7 @@ public class BasicWxClient implements WxClient {
                 try {
                     syncCheckResponse = syncComet(finalValidHost);
                 } catch (RuntimeException e) {
-                    LOG.error("exception when sync check", e);
+                    LOG.error("exception when sync check: '{}', sleep 3 seconds to retry", e.getMessage());
                     try {
                         Thread.sleep(TimeUnit.SECONDS.toMillis(3));
                     } catch (InterruptedException e1) {
@@ -155,20 +151,21 @@ public class BasicWxClient implements WxClient {
                 }
 
                 if (syncCheckResponse.getRetcode() != 0) {
-                    LOG.error("invalid synccheck retcode, retcode=" + syncCheckResponse.getRetcode());
-                    try {
-                        Thread.sleep(TimeUnit.SECONDS.toMillis(10));
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
+                    LOG.error("invalid synccheck retcode, retcode={}", syncCheckResponse.getRetcode());
                 } else {
                     LOG.trace("synccheck retcode = {}", syncCheckResponse.getRetcode());
                 }
 
-                try {
-                    sync();
-                } catch (RuntimeException e) {
-                    LOG.error("sync exception", e);
+                Optional<SyncCheckSelector> selectorOptional =
+                        SyncCheckSelector.findByInt(syncCheckResponse.getSelector());
+                if (selectorOptional.isPresent() && selectorOptional.get() != SyncCheckSelector.NORMAL) {
+                    try {
+                        sync();
+                    } catch (RuntimeException e) {
+                        LOG.error("sync exception", e);
+                    }
+                } else if (!selectorOptional.isPresent()) {
+                    LOG.warn("unknown selector: {}", syncCheckResponse.getSelector());
                 }
             }
         }).start();
@@ -258,7 +255,7 @@ public class BasicWxClient implements WxClient {
     }
 
     private SyncCheckResponse syncComet(String host) {
-        LOG.trace("sync comet to {}", host);
+        LOG.info("sync check");
         WxContext context = getContext();
         BaseRequest baseRequest = new BaseRequest(context);
 
@@ -281,7 +278,7 @@ public class BasicWxClient implements WxClient {
 
         SyncCheckResponse checkResponse = new SyncCheckResponse();
         checkResponse.setRetcode(retcode);
-        checkResponse.setSelector(SyncCheckSelector.findByInt(selector));
+        checkResponse.setSelector(selector);
 
         return checkResponse;
     }

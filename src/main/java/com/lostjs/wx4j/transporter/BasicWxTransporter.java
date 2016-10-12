@@ -49,7 +49,7 @@ public class BasicWxTransporter implements WxTransporter {
     public static final String USER_AGENT =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12) AppleWebKit/602.1.50 (KHTML, like Gecko) Version/10.0 Safari/602.1.50";
 
-    public static final int REQUEST_TIMEOUT = (int) TimeUnit.SECONDS.toMillis(60);
+    public static final int REQUEST_TIMEOUT = (int) TimeUnit.SECONDS.toMillis(30);
 
     protected final WxContext context;
 

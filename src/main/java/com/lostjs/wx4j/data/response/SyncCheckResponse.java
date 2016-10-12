@@ -7,7 +7,7 @@ public class SyncCheckResponse {
 
     private int retcode;
 
-    private SyncCheckSelector selector;
+    private int selector;
 
     public int getRetcode() {
         return retcode;
@@ -17,11 +17,11 @@ public class SyncCheckResponse {
         this.retcode = retcode;
     }
 
-    public SyncCheckSelector getSelector() {
+    public int getSelector() {
         return selector;
     }
 
-    public void setSelector(SyncCheckSelector selector) {
+    public void setSelector(int selector) {
         this.selector = selector;
     }
 }
