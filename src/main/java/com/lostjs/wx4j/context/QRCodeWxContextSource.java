@@ -6,18 +6,14 @@ import com.lostjs.wx4j.utils.WxCodeParser;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.CookieStore;
-import org.apache.http.client.ServiceUnavailableRetryStrategy;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
-import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
-import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.protocol.HttpContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
@@ -50,6 +46,9 @@ public class QRCodeWxContextSource implements WxContextSource {
     private Logger LOG = LoggerFactory.getLogger(this.getClass());
 
     private String uuid;
+
+    @Autowired
+    private HttpUtil httpUtil;
 
     public String prepareLogin(WxContext context) {
         this.uuid = getUUID(context);
@@ -252,19 +251,6 @@ public class QRCodeWxContextSource implements WxContextSource {
         }
         HttpRequest request = new HttpGet(uri);
 
-        return HttpUtil.execute(uri, request, HttpClientBuilder.create().setRetryHandler(
-                new DefaultHttpRequestRetryHandler()).setServiceUnavailableRetryStrategy(
-                new ServiceUnavailableRetryStrategy() {
-                    @Override
-                    public boolean retryRequest(HttpResponse response, int executionCount, HttpContext context) {
-                        int statusCode = response.getStatusLine().getStatusCode();
-                        return statusCode != 200 && executionCount < 5;
-                    }
-
-                    @Override
-                    public long getRetryInterval() {
-                        return 1000;
-                    }
-                }).build());
+        return httpUtil.execute(uri, request);
     }
 }

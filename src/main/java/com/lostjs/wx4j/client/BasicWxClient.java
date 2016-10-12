@@ -10,15 +10,12 @@ import com.lostjs.wx4j.transporter.WxTransporter;
 import com.lostjs.wx4j.utils.HttpUtil;
 import com.lostjs.wx4j.utils.WxSyncKeyUtil;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.ServiceUnavailableRetryStrategy;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
-import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.protocol.HttpContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -74,6 +71,9 @@ public class BasicWxClient implements WxClient {
     private Logger LOG = LoggerFactory.getLogger(this.getClass());
 
     private WxTransporter transporter;
+
+    @Autowired
+    private HttpUtil httpUtil;
 
     @Override
     public void setTransporter(WxTransporter transporter) {
@@ -282,7 +282,12 @@ public class BasicWxClient implements WxClient {
         SyncResponse syncResponse = transporter.execute(API_SYNC, dataMap, new TypeReference<SyncResponse>() {
         });
 
-        getContext().setSyncKeys(syncResponse.getSyncKeyContainer().getList());
+        if (syncResponse.getBaseResponse().getRet() == 0) {
+            getContext().setSyncKeys(syncResponse.getSyncKeyContainer().getList());
+        } else {
+            LOG.warn("sync ret is not 0, ret={}", syncResponse.getBaseResponse().getRet());
+        }
+
         LOG.debug(getContext().getSyncKeys().toString());
     }
 
@@ -303,20 +308,12 @@ public class BasicWxClient implements WxClient {
             throw new RuntimeException(e);
         }
 
-        String response = HttpUtil.execute(uri, new HttpGet(uri), HttpClientBuilder.create().setRetryHandler(
-                new DefaultHttpRequestRetryHandler()).setServiceUnavailableRetryStrategy(
-                new ServiceUnavailableRetryStrategy() {
-                    @Override
-                    public boolean retryRequest(HttpResponse response, int executionCount, HttpContext context) {
-                        int statusCode = response.getStatusLine().getStatusCode();
-                        return statusCode != 200 && executionCount < 5;
-                    }
-
-                    @Override
-                    public long getRetryInterval() {
-                        return 1000;
-                    }
-                }).build());
+        HttpGet request = new HttpGet(uri);
+        int timeout = (int) TimeUnit.SECONDS.toMillis(60);
+        RequestConfig config = RequestConfig.custom().setConnectTimeout(timeout).setSocketTimeout(
+                timeout).setConnectionRequestTimeout(timeout).build();
+        request.setConfig(config);
+        String response = httpUtil.execute(uri, request);
 
         Pattern pattern = Pattern.compile("window\\.synccheck=\\{retcode:\"(\\d+)\",selector:\"(\\d+)\"\\}");
         Matcher m = pattern.matcher(response);
