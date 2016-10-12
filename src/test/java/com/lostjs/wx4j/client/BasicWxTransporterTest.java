@@ -28,14 +28,14 @@ public class BasicWxTransporterTest {
     @Test
     @Ignore
     public void post() throws Exception {
-        String response = wxTransporter.execute("/webwxinit");
+        String response = wxTransporter.post("/webwxinit");
         System.out.println(response);
     }
 
     @Test
     @Ignore
     public void post_params() throws Exception {
-        String response = wxTransporter.execute("/webwxgetcontact");
+        String response = wxTransporter.post("/webwxgetcontact");
         LOG.info("contact list: {}", response);
     }
 

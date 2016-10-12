@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lostjs.wx4j.data.SyncKey;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.cookie.Cookie;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,6 +162,11 @@ public abstract class AbstractPersistentWxContext implements WxContext {
     protected abstract void read();
 
     protected void loadFromString(String string) {
+        if (StringUtils.isBlank(string)) {
+            LOG.warn("skip load empty context");
+            return;
+        }
+
         WxContext webContext;
         try {
             ObjectMapper objectMapper = new ObjectMapper();

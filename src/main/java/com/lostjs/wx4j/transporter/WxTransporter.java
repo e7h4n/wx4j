@@ -13,22 +13,30 @@ import java.util.Map;
  */
 public interface WxTransporter {
 
-    WxContext getWxContext();
+    WxContext getContext();
 
-    String execute(String api);
+    String get(String api);
 
-    String execute(String api, List<NameValuePair> params);
+    String get(String api, List<NameValuePair> params);
 
-    String execute(String api, Map<String, Object> dataMap);
+    <T extends WxResponse> T get(String api, List<NameValuePair> params, TypeReference<T> responseType);
 
-    <T extends WxResponse> T execute(String api, TypeReference<T> responseType);
+    <T extends WxResponse> T get(String api, TypeReference<T> responseType);
 
-    <T extends WxResponse> T execute(String api, Map<String, Object> dataMap, TypeReference<T> responseType);
+    String post(String api);
 
-    <T extends WxResponse> T execute(String api, List<NameValuePair> params, TypeReference<T> responseType);
+    String post(String api, List<NameValuePair> params);
 
-    <T extends WxResponse> T execute(String api, List<NameValuePair> params, Map<String, Object> dataMap,
-                                     TypeReference<T> responseType);
+    String post(String api, Map<String, Object> dataMap);
 
-    String execute(String api, List<NameValuePair> params, Map<String, Object> dataMap);
+    <T extends WxResponse> T post(String api, TypeReference<T> responseType);
+
+    <T extends WxResponse> T post(String api, Map<String, Object> dataMap, TypeReference<T> responseType);
+
+    <T extends WxResponse> T post(String api, List<NameValuePair> params, TypeReference<T> responseType);
+
+    <T extends WxResponse> T post(String api, List<NameValuePair> params, Map<String, Object> dataMap,
+                                  TypeReference<T> responseType);
+
+    String post(String api, List<NameValuePair> params, Map<String, Object> dataMap);
 }

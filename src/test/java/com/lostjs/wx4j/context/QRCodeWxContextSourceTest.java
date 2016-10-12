@@ -10,8 +10,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-
 /**
  * Created by pw on 01/10/2016.
  */
@@ -22,8 +20,10 @@ public class QRCodeWxContextSourceTest {
     @Test
     @Ignore
     public void testInit() throws Exception {
-        WxContextSource contextSource = new QRCodeWxContextSource();
         WxContext context = new FileWxContext(TestHelper.getTmpFilePath());
+        WxTransporter transporter = new BasicWxTransporter(context);
+
+        WxContextSource contextSource = new QRCodeWxContextSource(transporter);
         boolean success = contextSource.initWxWebContext(context);
         Assert.assertTrue(success);
         Assert.assertTrue(StringUtils.isNotBlank(context.getSid()));
@@ -32,9 +32,9 @@ public class QRCodeWxContextSourceTest {
         Assert.assertTrue(StringUtils.isNotBlank(context.getSkey()));
         Assert.assertTrue(StringUtils.isNotBlank(context.getUin()));
 
-        WxTransporter wxTransporter = new BasicWxTransporter(context);
-        LOG.info("init: {}", wxTransporter.execute("/webwxinit"));
-        String contactResponse = wxTransporter.execute("/webwxgetcontact");
+
+        LOG.info("init: {}", transporter.post("/webwxinit"));
+        String contactResponse = transporter.post("/webwxgetcontact");
 
         LOG.info("concactResponse: {}", contactResponse);
     }
