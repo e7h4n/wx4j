@@ -196,6 +196,7 @@ public abstract class AbstractPersistentWxContext implements WxContext {
 
     private void lazyLoad() {
         if (!loaded) {
+            loaded = true;
             try {
                 read();
             } catch (RuntimeException e) {

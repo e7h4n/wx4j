@@ -5,5 +5,5 @@ package com.lostjs.wx4j.context;
  */
 public interface WxContextSource {
 
-    boolean initWxWebContext(WxContext wxContext);
+    boolean initWxWebContext();
 }
