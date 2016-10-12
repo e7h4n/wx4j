@@ -6,7 +6,7 @@
 
     <groupId>com.lostjs</groupId>
     <artifactId>wx4j</artifactId>
-    <version>1.0.5</version>
+    <version>1.0.6</version>
     <name>wx4j</name>
     <description>A wechat api library through web wechat protocol.</description>
     <url>https://github.com/perfectworks/wx4j</url>

@@ -10,6 +10,7 @@ import com.lostjs.wx4j.data.response.BaseResponse;
 import com.lostjs.wx4j.data.response.WxResponse;
 import com.lostjs.wx4j.exception.InvalidResponseException;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.*;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.ServiceUnavailableRetryStrategy;
@@ -20,6 +21,7 @@ import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.StandardHttpRequestRetryHandler;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HttpContext;
@@ -81,22 +83,17 @@ public class BasicWxTransporter implements WxTransporter {
             throw new RuntimeException(e);
         }
 
-        HttpGet get = new HttpGet(uri);
-        return execute(uri, get);
+        return execute(uri, new HttpGet(uri));
     }
 
     @Override
     public <T extends WxResponse> T get(String api, List<NameValuePair> params, TypeReference<T> responseType) {
-        String responseBody = get(api, params);
-
-        return convertResponse(responseType, responseBody);
+        return internalGet(api, params, responseType);
     }
 
     @Override
     public <T extends WxResponse> T get(String api, TypeReference<T> responseType) {
-        String responseBody = get(api);
-
-        return convertResponse(responseType, responseBody);
+        return get(api, Collections.emptyList(), responseType);
     }
 
     @Override
@@ -132,9 +129,7 @@ public class BasicWxTransporter implements WxTransporter {
     @Override
     public <T extends WxResponse> T post(String api, List<NameValuePair> params, Map<String, Object> dataMap,
                                          TypeReference<T> responseType) {
-        String responseBody = post(api, params, dataMap);
-
-        return convertResponse(responseType, responseBody);
+        return internalPost(api, params, dataMap, responseType);
     }
 
     @Override
@@ -172,16 +167,59 @@ public class BasicWxTransporter implements WxTransporter {
         }
     }
 
+    private <T extends WxResponse> T internalGet(String api, List<NameValuePair> params,
+                                                 TypeReference<T> responseType) {
+        while (true) {
+            try {
+                String responseBody = get(api, params);
+                return convertResponse(responseType, responseBody);
+            } catch (InvalidResponseException e) {
+                processInvalidResponseException(e);
+            }
+        }
+    }
+
+    private void processInvalidResponseException(InvalidResponseException e) {
+        if (e.getRet() == 1101) {
+            try {
+                LOG.warn("encounter 1101, sleep 3 seconds to retry");
+
+                Thread.sleep(TimeUnit.SECONDS.toMillis(3));
+            } catch (InterruptedException e1) {
+                throw new RuntimeException(e1);
+            }
+            return;
+        }
+
+        throw e;
+    }
+
+    private <T extends WxResponse> T internalPost(String api, List<NameValuePair> params, Map<String, Object> dataMap,
+                                                  TypeReference<T> responseType) {
+        while (true) {
+            try {
+                String responseBody = post(api, params, dataMap);
+                return convertResponse(responseType, responseBody);
+            } catch (InvalidResponseException e) {
+                processInvalidResponseException(e);
+            }
+        }
+    }
+
     private HttpClient getHttpClient() {
         ArrayList<Header> headers = new ArrayList<>();
         headers.add(new BasicHeader(HttpHeaders.CONTENT_TYPE, "charset=UTF-8"));
         headers.add(new BasicHeader(HttpHeaders.USER_AGENT, USER_AGENT));
 
-        RequestConfig defaultRequestConfig = RequestConfig.custom().setConnectTimeout(REQUEST_TIMEOUT).build();
+        RequestConfig defaultRequestConfig = RequestConfig.custom()
+                .setSocketTimeout(REQUEST_TIMEOUT)
+                .setConnectionRequestTimeout(REQUEST_TIMEOUT)
+                .setConnectTimeout(REQUEST_TIMEOUT)
+                .build();
 
         return HttpClientBuilder.create().setDefaultCookieStore(context).setDefaultHeaders(headers)
                 .setDefaultRequestConfig(defaultRequestConfig)
-                .setRetryHandler(new DefaultHttpRequestRetryHandler(MAX_RETRY, true))
+                .setRetryHandler(new StandardHttpRequestRetryHandler(MAX_RETRY, true))
                 .setServiceUnavailableRetryStrategy(new ServiceUnavailableRetryStrategy() {
 
                     @Override
@@ -220,6 +258,19 @@ public class BasicWxTransporter implements WxTransporter {
     private String getUrl(String api) {
         Pattern pattern = Pattern.compile("^https?://");
         Matcher matcher = pattern.matcher(api);
+        if (matcher.find()) {
+            return api;
+        }
+
+        while (StringUtils.isEmpty(context.getBaseUrl())) {
+            LOG.warn("context is uninitialized, sleep 3 seconds to retry");
+            try {
+                Thread.sleep(TimeUnit.SECONDS.toMillis(3));
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         return matcher.find() ? api : context.getBaseUrl() + api;
     }
 

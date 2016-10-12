@@ -1,7 +1,9 @@
 package com.lostjs.wx4j.client;
 
 import com.lostjs.wx4j.context.FileWxContext;
+import com.lostjs.wx4j.context.QRCodeWxContextSource;
 import com.lostjs.wx4j.context.WxContext;
+import com.lostjs.wx4j.context.WxContextSource;
 import com.lostjs.wx4j.data.response.Contact;
 import com.lostjs.wx4j.data.response.GroupMember;
 import com.lostjs.wx4j.test.TestHelper;
@@ -31,8 +33,12 @@ public class BasicWxClientTest {
         System.setProperty("jsse.enableSNIExtension", "false");
 
         WxContext WxContext = new FileWxContext(TestHelper.getTmpFilePath());
+        BasicWxTransporter wxTransporter = new BasicWxTransporter(WxContext);
+        WxContextSource wxContextSource = new QRCodeWxContextSource(wxTransporter);
+
         client = new BasicWxClient();
-        client.setTransporter(new BasicWxTransporter(WxContext));
+        client.setTransporter(wxTransporter);
+        client.setContextSource(wxContextSource);
     }
 
     @Test
@@ -48,7 +54,7 @@ public class BasicWxClientTest {
     @Test
     @Ignore
     public void startEventLoop() throws Exception {
-        client.startEventLoop();
+        client.syncCheckLoop();
     }
 
     @Test

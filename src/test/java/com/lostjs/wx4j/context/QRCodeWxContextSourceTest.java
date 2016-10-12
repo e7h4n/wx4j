@@ -24,7 +24,7 @@ public class QRCodeWxContextSourceTest {
         WxTransporter transporter = new BasicWxTransporter(context);
 
         WxContextSource contextSource = new QRCodeWxContextSource(transporter);
-        boolean success = contextSource.initWxWebContext();
+        boolean success = contextSource.refresh();
         Assert.assertTrue(success);
         Assert.assertTrue(StringUtils.isNotBlank(context.getSid()));
         Assert.assertTrue(StringUtils.isNotBlank(context.getBaseUrl()));

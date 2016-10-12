@@ -2,6 +2,7 @@ package com.lostjs.wx4j.client;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.lostjs.wx4j.context.WxContext;
+import com.lostjs.wx4j.context.WxContextSource;
 import com.lostjs.wx4j.data.SyncResponse;
 import com.lostjs.wx4j.data.request.BaseRequest;
 import com.lostjs.wx4j.data.request.TinyContact;
@@ -63,6 +64,13 @@ public class BasicWxClient implements WxClient {
 
     private WxTransporter transporter;
 
+    private WxContextSource contextSource;
+
+    @Override
+    public void setContextSource(WxContextSource contextSource) {
+        this.contextSource = contextSource;
+    }
+
     @Override
     public void setTransporter(WxTransporter transporter) {
         this.transporter = transporter;
@@ -108,67 +116,46 @@ public class BasicWxClient implements WxClient {
     }
 
     @Override
-    public void startEventLoop() {
+    public void syncCheckLoop(String cometHost) {
         if (StringUtils.isEmpty(getContext().getUserName())) {
             init();
         }
 
-        LOG.info("check valid comet host");
-        String validHost = null;
-        SyncCheckResponse checkResponse = null;
-        for (String host : PUSH_HOST_LIST) {
+        while (true) {
+            SyncCheckResponse syncCheckResponse;
             try {
-                SyncCheckResponse syncCheckResponse = syncComet(host);
-                if (syncCheckResponse.getRetcode() == 0) {
-                    checkResponse = syncCheckResponse;
-                    validHost = host;
-                    continue;
-                }
+                syncCheckResponse = syncComet(cometHost);
             } catch (RuntimeException e) {
-                LOG.error("", e);
-            }
-        }
-
-        if (checkResponse == null) {
-            throw new RuntimeException("sync check error, all comet return error code 1100");
-        }
-
-        String finalValidHost = validHost;
-        LOG.info("valid comet host: {}", validHost);
-        new Thread(() -> {
-            while (true) {
-                SyncCheckResponse syncCheckResponse = null;
+                LOG.error("exception when sync check: '{}', sleep 3 seconds to retry", e.getMessage());
                 try {
-                    syncCheckResponse = syncComet(finalValidHost);
-                } catch (RuntimeException e) {
-                    LOG.error("exception when sync check: '{}', sleep 3 seconds to retry", e.getMessage());
-                    try {
-                        Thread.sleep(TimeUnit.SECONDS.toMillis(3));
-                    } catch (InterruptedException e1) {
-                        throw new RuntimeException(e1);
-                    }
-                    continue;
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(3));
+                } catch (InterruptedException e1) {
+                    throw new RuntimeException(e1);
                 }
-
-                if (syncCheckResponse.getRetcode() != 0) {
-                    LOG.error("invalid synccheck retcode, retcode={}", syncCheckResponse.getRetcode());
-                } else {
-                    LOG.trace("synccheck retcode = {}", syncCheckResponse.getRetcode());
-                }
-
-                Optional<SyncCheckSelector> selectorOptional =
-                        SyncCheckSelector.findByInt(syncCheckResponse.getSelector());
-                if (selectorOptional.isPresent() && selectorOptional.get() != SyncCheckSelector.NORMAL) {
-                    try {
-                        sync();
-                    } catch (RuntimeException e) {
-                        LOG.error("sync exception", e);
-                    }
-                } else if (!selectorOptional.isPresent()) {
-                    LOG.warn("unknown selector: {}", syncCheckResponse.getSelector());
-                }
+                continue;
             }
-        }).start();
+
+            if (syncCheckResponse.getRetcode() == 1101) {
+                LOG.error("login expired, try to refresh login");
+                cometHost = refreshContext();
+                continue;
+            } else if (syncCheckResponse.getRetcode() != 0) {
+                LOG.error("invalid synccheck retcode, retcode={}", syncCheckResponse.getRetcode());
+            } else {
+                LOG.trace("synccheck retcode = {}", syncCheckResponse.getRetcode());
+            }
+
+            Optional<SyncCheckSelector> selectorOptional = SyncCheckSelector.findByInt(syncCheckResponse.getSelector());
+            if (selectorOptional.isPresent() && selectorOptional.get() != SyncCheckSelector.NORMAL) {
+                try {
+                    sync();
+                } catch (RuntimeException e) {
+                    LOG.error("sync exception", e);
+                }
+            } else if (!selectorOptional.isPresent()) {
+                LOG.warn("unknown selector: {}", syncCheckResponse.getSelector());
+            }
+        }
     }
 
     @Override
@@ -221,6 +208,48 @@ public class BasicWxClient implements WxClient {
         });
 
         return true;
+    }
+
+    @Override
+    public void syncCheckLoop() {
+        syncCheckLoop(testValidCometHost());
+    }
+
+    private String refreshContext() {
+        getContext().clear();
+        if (!contextSource.refresh()) {
+            throw new RuntimeException("can't refresh context");
+        }
+
+        init();
+        statusNotify();
+
+        return testValidCometHost();
+    }
+
+    private String testValidCometHost() {
+        LOG.info("check valid comet host");
+        String validHost = null;
+        SyncCheckResponse checkResponse = null;
+        for (String host : PUSH_HOST_LIST) {
+            try {
+                SyncCheckResponse syncCheckResponse = syncComet(host);
+                if (syncCheckResponse.getRetcode() == 0) {
+                    checkResponse = syncCheckResponse;
+                    validHost = host;
+                    continue;
+                }
+            } catch (RuntimeException e) {
+                LOG.error("", e);
+            }
+        }
+
+        if (checkResponse == null) {
+            refreshContext();
+            return testValidCometHost();
+        }
+
+        return validHost;
     }
 
     private long getClientMessageId() {

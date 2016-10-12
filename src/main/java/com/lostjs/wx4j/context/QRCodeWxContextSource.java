@@ -147,7 +147,22 @@ public class QRCodeWxContextSource implements WxContextSource {
     }
 
     @Override
-    public boolean initWxWebContext() {
+    public boolean refresh() {
+        while (true) {
+            boolean success = false;
+            try {
+                success = internalRefresh();
+            } catch (RuntimeException e) {
+                LOG.error("error when refresh context", e);
+            }
+
+            if (success) {
+                return true;
+            }
+        }
+    }
+
+    private boolean internalRefresh() {
         String qrcodeLink = prepareLogin();
         String qrcode = QrCodeUtil.genTerminalQrCode(qrcodeLink);
         LOG.info("Scan qrcode to login: \n{}", qrcode);
