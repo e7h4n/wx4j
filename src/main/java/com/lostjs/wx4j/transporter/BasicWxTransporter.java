@@ -19,9 +19,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.client.StandardHttpRequestRetryHandler;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HttpContext;
@@ -51,7 +49,7 @@ public class BasicWxTransporter implements WxTransporter {
     public static final String USER_AGENT =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12) AppleWebKit/602.1.50 (KHTML, like Gecko) Version/10.0 Safari/602.1.50";
 
-    public static final int REQUEST_TIMEOUT = (int) TimeUnit.SECONDS.toMillis(30);
+    public static final int REQUEST_TIMEOUT = (int) TimeUnit.SECONDS.toMillis(60);
 
     protected final WxContext context;
 
@@ -211,15 +209,13 @@ public class BasicWxTransporter implements WxTransporter {
         headers.add(new BasicHeader(HttpHeaders.CONTENT_TYPE, "charset=UTF-8"));
         headers.add(new BasicHeader(HttpHeaders.USER_AGENT, USER_AGENT));
 
-        RequestConfig defaultRequestConfig = RequestConfig.custom()
-                .setSocketTimeout(REQUEST_TIMEOUT)
-                .setConnectionRequestTimeout(REQUEST_TIMEOUT)
-                .setConnectTimeout(REQUEST_TIMEOUT)
-                .build();
+        RequestConfig defaultRequestConfig =
+                RequestConfig.custom().setSocketTimeout(REQUEST_TIMEOUT).setConnectionRequestTimeout(REQUEST_TIMEOUT)
+                        .setConnectTimeout(REQUEST_TIMEOUT).build();
 
         return HttpClientBuilder.create().setDefaultCookieStore(context).setDefaultHeaders(headers)
                 .setDefaultRequestConfig(defaultRequestConfig)
-                .setRetryHandler(new StandardHttpRequestRetryHandler(MAX_RETRY, true))
+                .setRetryHandler((exception, executionCount, httpContext) -> executionCount < 10)
                 .setServiceUnavailableRetryStrategy(new ServiceUnavailableRetryStrategy() {
 
                     @Override
