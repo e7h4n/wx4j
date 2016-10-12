@@ -6,7 +6,6 @@ import com.lostjs.wx4j.data.SyncResponse;
 import com.lostjs.wx4j.data.request.BaseRequest;
 import com.lostjs.wx4j.data.request.TinyContact;
 import com.lostjs.wx4j.data.response.*;
-import com.lostjs.wx4j.exception.InvalidResponseException;
 import com.lostjs.wx4j.transporter.WxTransporter;
 import com.lostjs.wx4j.utils.WxSyncKeyUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -194,37 +193,23 @@ public class BasicWxClient implements WxClient {
 
     @Override
     public boolean addContact(String userName, String reason) {
-        int retryCount = 10;
-        int[] retryDuration = {1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144};
+        Map<String, Object> dataMap = new HashMap<>();
+        dataMap.put("Opcode", 2);
+        dataMap.put("VerifyContent", reason);
+        dataMap.put("skey", getContext().getSkey());
+        dataMap.put("VerifyUserListSize", 1);
+        ArrayList<Map<String, Object>> verifyUserList = new ArrayList<>();
+        Map<String, Object> verifyUser = new HashMap<>();
+        verifyUser.put("Value", userName);
+        verifyUser.put("VerifyUserTicket", "");
+        verifyUserList.add(verifyUser);
+        dataMap.put("VerifyUserList", verifyUserList);
+        dataMap.put("SceneListCount", 1);
+        dataMap.put("SceneList", Collections.singletonList(33));
+        transporter.post("/webwxverifyuser", dataMap, new TypeReference<AddContactResponse>() {
 
-        AddContactResponse addContactResponse = null;
-        for (int i = 0; i < retryCount; i++) {
-            try {
-                addContactResponse = internalAddContact(userName, reason);
-            } catch (InvalidResponseException e) {
-                int retryMinute = retryDuration[i];
-
-                LOG.warn(String.format("add contact got a invalid result, retry after %d minutes, ret=%d, message=%s",
-                        retryMinute, e.getRet(), e.getMessage()));
-
-                try {
-                    Thread.sleep(TimeUnit.MINUTES.toMillis(retryMinute));
-                } catch (InterruptedException e1) {
-                    throw new RuntimeException(e1);
-                }
-
-                continue;
-            }
-
-            return true;
-        }
-
-        assert addContactResponse != null;
-
-        LOG.warn("can't add contact, Ret={}, ErrMsg={}", addContactResponse.getBaseResponse().getRet(),
-                addContactResponse.getBaseResponse().getErrMsg());
-
-        return false;
+        });
+        return true;
     }
 
     @Override
@@ -239,25 +224,6 @@ public class BasicWxClient implements WxClient {
         });
 
         return true;
-    }
-
-    private AddContactResponse internalAddContact(String userName, String reason) {
-        Map<String, Object> dataMap = new HashMap<>();
-        dataMap.put("Opcode", 2);
-        dataMap.put("VerifyContent", reason);
-        dataMap.put("skey", getContext().getSkey());
-        dataMap.put("VerifyUserListSize", 1);
-        ArrayList<Map<String, Object>> verifyUserList = new ArrayList<>();
-        Map<String, Object> verifyUser = new HashMap<>();
-        verifyUser.put("Value", userName);
-        verifyUser.put("VerifyUserTicket", "");
-        verifyUserList.add(verifyUser);
-        dataMap.put("VerifyUserList", verifyUserList);
-        dataMap.put("SceneListCount", 1);
-        dataMap.put("SceneList", Collections.singletonList(33));
-        return transporter.post("/webwxverifyuser", dataMap, new TypeReference<AddContactResponse>() {
-
-        });
     }
 
     private long getClientMessageId() {
