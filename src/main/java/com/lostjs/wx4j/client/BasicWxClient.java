@@ -6,20 +6,15 @@ import com.lostjs.wx4j.data.SyncResponse;
 import com.lostjs.wx4j.data.request.BaseRequest;
 import com.lostjs.wx4j.data.request.TinyContact;
 import com.lostjs.wx4j.data.response.*;
+import com.lostjs.wx4j.exception.InvalidResponseException;
 import com.lostjs.wx4j.transporter.WxTransporter;
 import com.lostjs.wx4j.utils.WxSyncKeyUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.message.BasicNameValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -81,6 +76,7 @@ public class BasicWxClient implements WxClient {
     @Override
     public List<Contact> getContacts() {
         ContactResponse contactResponse = transporter.post(API_GET_CONTACT, new TypeReference<ContactResponse>() {
+
         });
 
         return contactResponse.getContacts();
@@ -108,8 +104,9 @@ public class BasicWxClient implements WxClient {
             return contact;
         }).collect(Collectors.toList());
         dataMap.put("List", tinyContacts);
-        ContactListResponse contactList = transporter.post(API_BATCH_GET_CONTACT, dataMap,
-                new TypeReference<ContactListResponse>() {
+        ContactListResponse contactList =
+                transporter.post(API_BATCH_GET_CONTACT, dataMap, new TypeReference<ContactListResponse>() {
+
                 });
 
         return contactList.getContacts();
@@ -166,7 +163,7 @@ public class BasicWxClient implements WxClient {
                         throw new RuntimeException(e);
                     }
                 } else {
-                    LOG.info("synccheck retcode = {}", syncCheckResponse.getRetcode());
+                    LOG.trace("synccheck retcode = {}", syncCheckResponse.getRetcode());
                 }
 
                 try {
@@ -187,8 +184,9 @@ public class BasicWxClient implements WxClient {
         dataMap.put(REQUEST_FIELD_TO_USER_NAME, getContext().getUserName());
         dataMap.put(REQUEST_FIELD_CLIENT_MESSAGE_ID, getClientMessageId());
 
-        StatusNotifyResponse statusNotifyResponse = transporter.post(API_STATUS_NOTIFY, dataMap,
-                new TypeReference<StatusNotifyResponse>() {
+        StatusNotifyResponse statusNotifyResponse =
+                transporter.post(API_STATUS_NOTIFY, dataMap, new TypeReference<StatusNotifyResponse>() {
+
                 });
 
         return statusNotifyResponse.getMsgId();
@@ -203,11 +201,14 @@ public class BasicWxClient implements WxClient {
         for (int i = 0; i < retryCount; i++) {
             try {
                 addContactResponse = internalAddContact(userName, reason);
-            } catch (RuntimeException e) {
-                LOG.warn("add contact got a invalid result", e);
+            } catch (InvalidResponseException e) {
+                int retryMinute = retryDuration[i];
+
+                LOG.warn(String.format("add contact got a invalid result, retry after %d minutes, ret=%d, message=%s",
+                        retryMinute, e.getRet(), e.getMessage()));
 
                 try {
-                    Thread.sleep(TimeUnit.MINUTES.toMillis(retryDuration[i]));
+                    Thread.sleep(TimeUnit.MINUTES.toMillis(retryMinute));
                 } catch (InterruptedException e1) {
                     throw new RuntimeException(e1);
                 }
@@ -233,9 +234,9 @@ public class BasicWxClient implements WxClient {
         dataMap.put("RemarkName", remarkName);
         dataMap.put("UserName", userName);
 
-        transporter.post("/webwxoplog", dataMap,
-                new TypeReference<UpdateRemarkNameResponse>() {
-                });
+        transporter.post("/webwxoplog", dataMap, new TypeReference<UpdateRemarkNameResponse>() {
+
+        });
 
         return true;
     }
@@ -254,9 +255,9 @@ public class BasicWxClient implements WxClient {
         dataMap.put("VerifyUserList", verifyUserList);
         dataMap.put("SceneListCount", 1);
         dataMap.put("SceneList", Collections.singletonList(33));
-        return transporter.post("/webwxverifyuser", dataMap,
-                new TypeReference<AddContactResponse>() {
-                });
+        return transporter.post("/webwxverifyuser", dataMap, new TypeReference<AddContactResponse>() {
+
+        });
     }
 
     private long getClientMessageId() {
@@ -278,6 +279,7 @@ public class BasicWxClient implements WxClient {
         dataMap.put(REQUEST_FIELD_RANDOM_RANDOM, System.currentTimeMillis());
 
         SyncResponse syncResponse = transporter.post(API_SYNC, dataMap, new TypeReference<SyncResponse>() {
+
         });
 
         if (syncResponse.getBaseResponse().getRet() == 0) {
@@ -290,7 +292,7 @@ public class BasicWxClient implements WxClient {
     }
 
     private SyncCheckResponse syncComet(String host) {
-        LOG.info("sync comet to {}", host);
+        LOG.trace("sync comet to {}", host);
         WxContext context = getContext();
         BaseRequest baseRequest = new BaseRequest(context);
 
@@ -298,7 +300,8 @@ public class BasicWxClient implements WxClient {
         params.add(new BasicNameValuePair(REQUEST_FIELD_SID_FOR_PUSH, baseRequest.getSid()));
         params.add(new BasicNameValuePair(REQUEST_FIELD_UIN_FOR_PUSH, baseRequest.getUin()));
         params.add(new BasicNameValuePair(REQUEST_FIELD_DEVICE_ID_FOR_PUSH, baseRequest.getDeviceID()));
-        params.add(new BasicNameValuePair(REQUEST_FIELD_SYNC_KEY_FOR_PUSH, WxSyncKeyUtil.format(context.getSyncKeys())));
+        params.add(
+                new BasicNameValuePair(REQUEST_FIELD_SYNC_KEY_FOR_PUSH, WxSyncKeyUtil.format(context.getSyncKeys())));
         String response = transporter.get(getPushApi(host), params);
 
         Pattern pattern = Pattern.compile("window\\.synccheck=\\{retcode:\"(\\d+)\",selector:\"(\\d+)\"\\}");
@@ -323,6 +326,7 @@ public class BasicWxClient implements WxClient {
 
     private void init() {
         InitResponse initResponse = transporter.post(API_INIT, new TypeReference<InitResponse>() {
+
         });
 
         String userName = initResponse.getUser().getUserName();

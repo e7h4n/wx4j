@@ -6,7 +6,9 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lostjs.wx4j.context.WxContext;
 import com.lostjs.wx4j.data.request.BaseRequest;
+import com.lostjs.wx4j.data.response.BaseResponse;
 import com.lostjs.wx4j.data.response.WxResponse;
+import com.lostjs.wx4j.exception.InvalidResponseException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.http.*;
 import org.apache.http.client.HttpClient;
@@ -181,6 +183,7 @@ public class BasicWxTransporter implements WxTransporter {
                 .setDefaultRequestConfig(defaultRequestConfig)
                 .setRetryHandler(new DefaultHttpRequestRetryHandler(MAX_RETRY, true))
                 .setServiceUnavailableRetryStrategy(new ServiceUnavailableRetryStrategy() {
+
                     @Override
                     public boolean retryRequest(HttpResponse response, int executionCount, HttpContext context) {
                         int statusCode = response.getStatusLine().getStatusCode();
@@ -231,13 +234,13 @@ public class BasicWxTransporter implements WxTransporter {
     }
 
     private void checkResponse(WxResponse response) {
-        if (response.getBaseResponse() == null) {
+        BaseResponse baseResponse = response.getBaseResponse();
+        if (baseResponse == null) {
             throw new RuntimeException("no BaseResponse");
         }
 
-        if (response.getBaseResponse().getRet() > 0) {
-            throw new RuntimeException("invalid response, ret=" + response.getBaseResponse().getRet() + ", errMsg=" +
-                    response.getBaseResponse().getErrMsg());
+        if (baseResponse.getRet() > 0) {
+            throw new InvalidResponseException(baseResponse.getRet(), baseResponse.getErrMsg());
         }
     }
 
