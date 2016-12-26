@@ -46,7 +46,7 @@ public class Contact {
 
     private int statues;
 
-    private int attrStatus;
+    private long attrStatus;
 
     private String Province;
 
@@ -196,12 +196,12 @@ public class Contact {
         this.statues = statues;
     }
 
-    public int getAttrStatus() {
+    public long getAttrStatus() {
         return attrStatus;
     }
 
     @JsonSetter("AttrStatus")
-    public void setAttrStatus(int attrStatus) {
+    public void setAttrStatus(long attrStatus) {
         this.attrStatus = attrStatus;
     }
 
