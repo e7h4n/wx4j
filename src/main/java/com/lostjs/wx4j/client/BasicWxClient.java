@@ -150,7 +150,7 @@ public class BasicWxClient implements WxClient {
                 if (!selectorOptional.isPresent()) {
                     LOG.warn("unknown selector: {}", syncCheckResponse.getSelector());
                 }
-                
+
                 try {
                     sync();
                 } catch (RuntimeException e) {

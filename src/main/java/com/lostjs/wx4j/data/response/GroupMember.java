@@ -8,7 +8,7 @@ import com.lostjs.wx4j.utils.WxNickNameConverter;
  */
 public class GroupMember {
 
-    private int uin;
+    private long uin;
 
     private String userName;
 
@@ -30,12 +30,12 @@ public class GroupMember {
 
     private String keyword;
 
-    public int getUin() {
+    public long getUin() {
         return uin;
     }
 
     @JsonSetter("Uin")
-    public void setUin(int uin) {
+    public void setUin(long uin) {
         this.uin = uin;
     }
 

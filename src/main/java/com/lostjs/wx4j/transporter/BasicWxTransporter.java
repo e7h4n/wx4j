@@ -244,7 +244,7 @@ public class BasicWxTransporter implements WxTransporter {
         try {
             responseObject = objectMapper.readValue(responseBody, responseType);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("failed to convert response: \n" + responseBody, e);
         }
 
         checkResponse(responseObject);

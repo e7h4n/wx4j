@@ -10,7 +10,7 @@ import java.util.List;
  */
 public class Contact {
 
-    private int uin;
+    private long uin;
 
     private String userName;
 
@@ -60,7 +60,7 @@ public class Contact {
 
     private String displayName;
 
-    private int chatRoomId;
+    private long chatRoomId;
 
     private String keyword;
 
@@ -70,12 +70,12 @@ public class Contact {
 
     private List<GroupMember> memberList;
 
-    public int getUin() {
+    public long getUin() {
         return uin;
     }
 
     @JsonSetter("Uin")
-    public void setUin(int uin) {
+    public void setUin(long uin) {
         this.uin = uin;
     }
 
@@ -259,12 +259,12 @@ public class Contact {
         this.displayName = displayName;
     }
 
-    public int getChatRoomId() {
+    public long getChatRoomId() {
         return chatRoomId;
     }
 
     @JsonSetter("ChatRoomId")
-    public void setChatRoomId(int chatRoomId) {
+    public void setChatRoomId(long chatRoomId) {
         this.chatRoomId = chatRoomId;
     }
 
