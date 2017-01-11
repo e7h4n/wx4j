@@ -47,7 +47,7 @@ public final class InvalidResponseException extends RuntimeException {
 
     @Override
     public String getMessage() {
-        return message;
+        return String.format("ret=%d, message=%s", ret, message);
     }
 
     @Override
