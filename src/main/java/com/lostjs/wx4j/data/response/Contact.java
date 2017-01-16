@@ -121,7 +121,7 @@ public class Contact {
 
     @JsonSetter("RemarkName")
     public void setRemarkName(String remarkName) {
-        this.remarkName = remarkName;
+        this.remarkName = WxNickNameConverter.convertFromHtml(remarkName);
     }
 
     public int getHideInputBarFlag() {
