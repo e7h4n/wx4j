@@ -31,6 +31,7 @@ public class BasicWxClientTest {
     private WxClient client;
 
     private BasicWxTransporter transporter;
+    private WxContext wxContext;
 
     /**
      * use QRCodeWxContextSourceTest to init context
@@ -40,8 +41,8 @@ public class BasicWxClientTest {
         System.setProperty("jsse.enableSNIExtension", "false");
 
         LOG.info("context file: {}", TestHelper.getTmpFilePath());
-        WxContext WxContext = new FileWxContext(TestHelper.getTmpFilePath());
-        transporter = new BasicWxTransporter(WxContext);
+        wxContext = new FileWxContext(TestHelper.getTmpFilePath());
+        transporter = new BasicWxTransporter(wxContext);
         WxContextSource wxContextSource = new QRCodeWxContextSource(transporter);
 
         client = new BasicWxClient();
@@ -85,7 +86,8 @@ public class BasicWxClientTest {
                 c -> c.getNickName().equals("蓝小盒")).findAny();
         Assert.assertTrue(targetContact.isPresent());
 
-        String url = String.format("https://wx.qq.com%s&type=big", targetContact.get().getHeadImgUrl());
+        String url = String.format("%s&type=big", targetContact.get().getHeadImgUrl().replace("/cgi-bin/mmwebwx-bin", ""));
+
         InputStream is = transporter.getBinary(url);
 
         String md5Hex = DigestUtils.md5Hex(is);

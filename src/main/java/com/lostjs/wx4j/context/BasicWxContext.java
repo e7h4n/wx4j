@@ -9,8 +9,6 @@ import com.lostjs.wx4j.data.WxCookie;
 import org.apache.http.client.CookieStore;
 import org.apache.http.cookie.Cookie;
 import org.apache.http.impl.client.BasicCookieStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.Date;
@@ -20,8 +18,6 @@ import java.util.List;
  * Created by pw on 02/10/2016.
  */
 public class BasicWxContext implements WxContext {
-
-    private Logger LOG = LoggerFactory.getLogger(this.getClass());
 
     private String skey;
 
@@ -131,13 +127,15 @@ public class BasicWxContext implements WxContext {
                 ", uin='" + uin + '\'' +
                 ", passTicket='" + passTicket + '\'' +
                 ", baseUrl='" + baseUrl + '\'' +
+                ", syncKeys=" + syncKeys +
+                ", userName='" + userName + '\'' +
+                ", cookieStore=" + cookieStore +
                 '}';
     }
 
     @Override
     @JsonIgnore
     public void addCookie(Cookie cookie) {
-        LOG.info("add cookie: {}", cookie.getName());
         cookieStore.addCookie(cookie);
     }
 
