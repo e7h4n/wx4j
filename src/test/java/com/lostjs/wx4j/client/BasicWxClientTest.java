@@ -36,6 +36,8 @@ public class BasicWxClientTest {
         BasicWxTransporter wxTransporter = new BasicWxTransporter(WxContext);
         WxContextSource wxContextSource = new QRCodeWxContextSource(wxTransporter);
 
+        wxContextSource.refresh();
+
         client = new BasicWxClient();
         client.setTransporter(wxTransporter);
         client.setContextSource(wxContextSource);
@@ -74,7 +76,7 @@ public class BasicWxClientTest {
     public void getContacts() throws Exception {
         List<Contact> contactList = client.getContacts();
         Optional<Contact> targetContact = contactList.stream().filter(
-                c -> c.getNickName().equals("翡丽铂庭 业主之家")).findAny();
+                c -> c.getNickName().equals("蓝小盒")).findAny();
         Assert.assertTrue(targetContact.isPresent());
     }
 }

@@ -5,6 +5,7 @@ import com.lostjs.wx4j.context.WxContext;
 import com.lostjs.wx4j.data.response.WxResponse;
 import org.apache.http.NameValuePair;
 
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
@@ -14,6 +15,10 @@ import java.util.Map;
 public interface WxTransporter {
 
     WxContext getContext();
+
+    InputStream getBinary(String api);
+
+    InputStream getBinary(String api, List<NameValuePair> params);
 
     String get(String api);
 

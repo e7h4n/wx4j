@@ -116,7 +116,9 @@ public class BasicWxContext implements WxContext {
     @JsonSetter("cookies")
     @JsonDeserialize(contentAs = WxCookie.class)
     public void setCookies(List<Cookie> cookies) {
-
+        cookies.forEach(cookie ->  {
+            cookieStore.addCookie(cookie);
+        });
     }
 
     @Override

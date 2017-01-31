@@ -65,12 +65,18 @@ public class BasicWxTransporter implements WxTransporter {
     }
 
     @Override
-    public String get(String api) {
-        return get(api, Collections.emptyList());
+    public InputStream getBinary(String api) {
+        return getBinary(api, Collections.emptyList());
     }
 
     @Override
-    public String get(String api, List<NameValuePair> params) {
+    public InputStream getBinary(String api, List<NameValuePair> params) {
+        URI uri = getUri(api, params);
+
+        return executeBinary(uri, new HttpGet(uri));
+    }
+
+    private URI getUri(String api, List<NameValuePair> params) {
         String url = getUrl(api);
         List<NameValuePair> targetParams = getRequestParams(params);
 
@@ -80,6 +86,17 @@ public class BasicWxTransporter implements WxTransporter {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
+        return uri;
+    }
+
+    @Override
+    public String get(String api) {
+        return get(api, Collections.emptyList());
+    }
+
+    @Override
+    public String get(String api, List<NameValuePair> params) {
+        URI uri = getUri(api, params);
 
         return execute(uri, new HttpGet(uri));
     }
@@ -292,6 +309,18 @@ public class BasicWxTransporter implements WxTransporter {
     }
 
     private String execute(URI uri, HttpRequest request) {
+        InputStream content = executeBinary(uri, request);
+
+        String responseBody;
+        try {
+            responseBody = StreamUtils.copyToString(content, Charset.forName("utf-8"));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return responseBody;
+    }
+
+    private InputStream executeBinary(URI uri, HttpRequest request) {
         HttpClient client = getHttpClient();
 
         HttpResponse httpResponse;
@@ -314,12 +343,6 @@ public class BasicWxTransporter implements WxTransporter {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        String responseBody;
-        try {
-            responseBody = StreamUtils.copyToString(content, Charset.forName("utf-8"));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return responseBody;
+        return content;
     }
 }
