@@ -8,6 +8,7 @@ import com.lostjs.wx4j.data.response.Contact;
 import com.lostjs.wx4j.data.response.GroupMember;
 import com.lostjs.wx4j.test.TestHelper;
 import com.lostjs.wx4j.transporter.BasicWxTransporter;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -16,6 +17,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InputStream;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,18 +30,22 @@ public class BasicWxClientTest {
 
     private WxClient client;
 
+    private BasicWxTransporter transporter;
+
+    /**
+     * use QRCodeWxContextSourceTest to init context
+     */
     @Before
     public void setUp() throws Exception {
         System.setProperty("jsse.enableSNIExtension", "false");
 
+        LOG.info("context file: {}", TestHelper.getTmpFilePath());
         WxContext WxContext = new FileWxContext(TestHelper.getTmpFilePath());
-        BasicWxTransporter wxTransporter = new BasicWxTransporter(WxContext);
-        WxContextSource wxContextSource = new QRCodeWxContextSource(wxTransporter);
-
-        wxContextSource.refresh();
+        transporter = new BasicWxTransporter(WxContext);
+        WxContextSource wxContextSource = new QRCodeWxContextSource(transporter);
 
         client = new BasicWxClient();
-        client.setTransporter(wxTransporter);
+        client.setTransporter(transporter);
         client.setContextSource(wxContextSource);
     }
 
@@ -78,5 +84,11 @@ public class BasicWxClientTest {
         Optional<Contact> targetContact = contactList.stream().filter(
                 c -> c.getNickName().equals("蓝小盒")).findAny();
         Assert.assertTrue(targetContact.isPresent());
+
+        String url = String.format("https://wx.qq.com%s&type=big", targetContact.get().getHeadImgUrl());
+        InputStream is = transporter.getBinary(url);
+
+        String md5Hex = DigestUtils.md5Hex(is);
+        LOG.info("md5hex: {}", md5Hex);
     }
 }

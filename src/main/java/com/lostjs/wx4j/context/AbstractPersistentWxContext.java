@@ -185,6 +185,7 @@ public abstract class AbstractPersistentWxContext implements WxContext {
         internalContext.setSyncKeys(webContext.getSyncKeys());
         internalContext.setUin(webContext.getUin());
         internalContext.setUserName(webContext.getUserName());
+        internalContext.setCookies(webContext.getCookies());
     }
 
     protected String dumpToString() throws JsonProcessingException {
